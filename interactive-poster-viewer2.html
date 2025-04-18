@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Vegetation Vibrancy Poster Viewer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        
+        .viewer-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .poster-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform-origin: center;
+        }
+        
+        .poster {
+            max-width: none;
+            max-height: none;
+            transition: transform 0.1s ease-out;
+        }
+        
+        .instruction {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            z-index: 100;
+            opacity: 1;
+            transition: opacity 2s;
+        }
+        
+        .instruction.fade {
+            opacity: 0.2;
+        }
+        
+        .instruction:hover {
+            opacity: 1;
+        }
+        
+        .zoom-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: 1px solid #888;
+            border-radius: 4px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .zoom-btn:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .reset-btn {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: 1px solid #888;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-container" id="viewer">
+        <div class="poster-container" id="posterContainer">
+            <img src="poster.jpg" alt="Vegetation Vibrancy in Hot, Arid Zones Over Time" class="poster" id="poster">
+        </div>
+    </div>
+    
+    <div class="instruction" id="instruction">
+        Move your cursor to navigate the poster. Hover near edges to pan.
+    </div>
+    
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomIn">+</button>
+        <button class="zoom-btn" id="zoomOut">−</button>
+        <button class="reset-btn" id="reset">Reset</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const viewer = document.getElementById('viewer');
+            const posterContainer = document.getElementById('posterContainer');
+            const poster = document.getElementById('poster');
+            const instruction = document.getElementById('instruction');
+            const zoomIn = document.getElementById('zoomIn');
+            const zoomOut = document.getElementById('zoomOut');
+            const reset = document.getElementById('reset');
+            
+            let scale = 1;
+            let currentX = 0;
+            let currentY = 0;
+            let isImageLoaded = false;
+            let viewerWidth, viewerHeight, posterWidth, posterHeight;
+            
+            // Hide instruction after 5 seconds
+            setTimeout(() => {
+                instruction.classList.add('fade');
+            }, 5000);
+            
+            // Wait for image to load to get its dimensions
+            poster.onload = function() {
+                isImageLoaded = true;
+                updateDimensions();
+                centerPoster();
+                
+                // Set initial scale to fit the poster in the viewport exactly
+                const scaleX = viewerWidth / posterWidth;
+                const scaleY = viewerHeight / posterHeight;
+                scale = Math.min(scaleX, scaleY); // Exact fit with no margin
+                updateTransform();
+            };
+            
+            function updateDimensions() {
+                viewerWidth = viewer.clientWidth;
+                viewerHeight = viewer.clientHeight;
+                posterWidth = poster.naturalWidth;
+                posterHeight = poster.naturalHeight;
+            }
+            
+            function centerPoster() {
+                currentX = 0;
+                currentY = 0;
+                updateTransform();
+            }
+            
+            function updateTransform() {
+                // Limit panning to prevent showing space outside the poster
+                const maxPanX = (posterWidth * scale - viewerWidth) / 2 / scale;
+                const maxPanY = (posterHeight * scale - viewerHeight) / 2 / scale;
+                
+                currentX = Math.max(-maxPanX, Math.min(maxPanX, currentX));
+                currentY = Math.max(-maxPanY, Math.min(maxPanY, currentY));
+                
+                posterContainer.style.transform = `scale(${scale}) translate(${currentX}px, ${currentY}px)`;
+            }
+            
+            // Interactive panning based on cursor position
+            viewer.addEventListener('mousemove', function(e) {
+                if (!isImageLoaded) return;
+                
+                // Get cursor position as a percentage of the viewer dimensions
+                const mouseX = e.clientX / viewerWidth;
+                const mouseY = e.clientY / viewerHeight;
+                
+                // Calculate the panning range based on scale
+                const maxPanX = (posterWidth * scale - viewerWidth) / 2 / scale;
+                const maxPanY = (posterHeight * scale - viewerHeight) / 2 / scale;
+                
+                // Map cursor position to pan position (inverted, so moving cursor right moves view left)
+                currentX = -(mouseX * 2 - 1) * maxPanX;
+                currentY = -(mouseY * 2 - 1) * maxPanY;
+                
+                updateTransform();
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                updateDimensions();
+                
+                // Recalculate scale to maintain fit
+                const scaleX = viewerWidth / posterWidth;
+                const scaleY = viewerHeight / posterHeight;
+                scale = Math.min(scaleX, scaleY) * 0.95;
+                
+                updateTransform();
+            });
+            
+            // Zoom controls
+            zoomIn.addEventListener('click', function() {
+                scale *= 1.2;
+                updateTransform();
+            });
+            
+            zoomOut.addEventListener('click', function() {
+                scale /= 1.2;
+                // Ensure minimum scale to always see the full poster
+                const minScaleX = viewerWidth / posterWidth;
+                const minScaleY = viewerHeight / posterHeight;
+                const minScale = Math.min(minScaleX, minScaleY); // Exact fit with no margin
+                scale = Math.max(scale, minScale);
+                updateTransform();
+            });
+            
+            reset.addEventListener('click', function() {
+                const scaleX = viewerWidth / posterWidth;
+                const scaleY = viewerHeight / posterHeight;
+                scale = Math.min(scaleX, scaleY); // Exact fit with no margin
+                centerPoster();
+            });
+            
+            // Touch support for mobile devices
+            let touchStartX, touchStartY;
+            
+            viewer.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 1) {
+                    touchStartX = e.touches[0].clientX / viewerWidth;
+                    touchStartY = e.touches[0].clientY / viewerHeight;
+                }
+            });
+            
+            viewer.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 1) {
+                    const touchX = e.touches[0].clientX / viewerWidth;
+                    const touchY = e.touches[0].clientY / viewerHeight;
+                    
+                    // Calculate delta movement
+                    const deltaX = touchStartX - touchX;
+                    const deltaY = touchStartY - touchY;
+                    
+                    // Calculate the panning range based on scale
+                    const maxPanX = (posterWidth * scale - viewerWidth) / 2 / scale;
+                    const maxPanY = (posterHeight * scale - viewerHeight) / 2 / scale;
+                    
+                    // Map delta to pan position
+                    currentX = -(deltaX * 2) * maxPanX;
+                    currentY = -(deltaY * 2) * maxPanY;
+                    
+                    updateTransform();
+                    
+                    // Prevent default scrolling behavior
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
